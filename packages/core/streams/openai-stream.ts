@@ -1,4 +1,5 @@
-import { CreateMessage } from '../shared/types'
+import { ChatCompletionRequestMessage } from 'openai-edge'
+import type { CreateMessage, JSONValue, Message } from '../shared/types'
 
 import {
   AIStream,
@@ -6,14 +7,6 @@ import {
   type AIStreamCallbacks,
   FunctionCallPayload
 } from './ai-stream'
-
-type JSONValue =
-  | null
-  | string
-  | number
-  | boolean
-  | { [x: string]: JSONValue }
-  | Array<JSONValue>
 
 export type OpenAIStreamCallbacks = AIStreamCallbacks & {
   /**
@@ -36,7 +29,7 @@ export type OpenAIStreamCallbacks = AIStreamCallbacks & {
    *       model: 'gpt-3.5-turbo-0613',
    *       stream: true,
    *       // Append the relevant "assistant" and "function" call messages
-   *       messages: [...messages, ...createFunctionCallMessages(result)],
+   *       messages: createFunctionCallMessages(result, messages),
    *       functions,
    *     })
    *   }
@@ -46,8 +39,9 @@ export type OpenAIStreamCallbacks = AIStreamCallbacks & {
   experimental_onFunctionCall?: (
     functionCallPayload: FunctionCallPayload,
     createFunctionCallMessages: (
-      functionCallResult: JSONValue
-    ) => CreateMessage[]
+      functionCallResult: JSONValue,
+      messages?: Message[]
+    ) => ChatCompletionRequestMessage[]
   ) => Promise<Response | undefined | void | string>
 }
 
@@ -260,7 +254,7 @@ function createFunctionCallTransformer(
             name: payload.function_call.name,
             arguments: argumentsPayload
           },
-          result => {
+          function createFunctionCallMessages(result, messages) {
             // Append the function call request and result messages to the list
             newFunctionCallMessages = [
               ...functionCallMessages,
@@ -277,7 +271,7 @@ function createFunctionCallTransformer(
             ]
 
             // Return it to the user
-            return newFunctionCallMessages
+            return [...(messages || []), ...newFunctionCallMessages] as ChatCompletionRequestMessage[]
           }
         )
 
